@@ -13,7 +13,8 @@ int N, K, T, R;
 int hour = 0;
 int mins = 0;
 int minCnt = 0;
-int warEnd = 0;
+int warEndb = 0;
+int warEndr = 0;
 
 
 void printT()
@@ -39,7 +40,7 @@ class Weapon
     
     Weapon (int i, Warrior * p);
     public:
-    int No;
+    int No; // 0 sword, 1 , bomb, 2 arrow
     int damage;
     virtual ~Weapon() {}
     virtual int getDmg() // returns damage
@@ -48,7 +49,7 @@ class Weapon
     }
     virtual void useWeapon () {}
     virtual void updateDmg () {}
-    
+    virtual void printWeap() {}
     virtual void newOwner( Warrior * p)
     {
         pOwner = p;
@@ -61,6 +62,7 @@ class Sword: public Weapon
     public:
     Sword(Warrior * p);
     void updateDmg( int percent = 100);
+    void printWeap();
     void useWeapon()
     {
         updateDmg(80);
@@ -73,15 +75,16 @@ class Bomb: public Weapon
     public:
     Bomb(Warrior * p);
     void updateDmg ();
-    void useWeapon();
+    void printWeap();
+    void useWeapon(){}
 };
 
 class Arrow: public Weapon
 {
     public:
     Arrow( Warrior * p);
-    void updateDmg (int percent = 100);
-
+    void updateDmg ();
+    void printWeap();
 
     void useWeapon()
     {
@@ -95,23 +98,34 @@ class City
     Warrior * redWar = NULL; Warrior * blueWar = NULL;
     int CityNo;
     int deathCnt = 0;
-    int whoStart = 0;
+    int whoStart = 0; //-1 red, 1 blue.
+    int elements = 0;
 
     City(int i): CityNo(i){}
-
+    void DragRoarTest();
     int flag = 0; //-1 red, 0 none, 1 blue.
     int last_won = 0; //-1 red, 1 blue.
-
+    void printFlag( int i);
     void endBattle();
+    void warTake(Warrior * p = NULL); 
     void fight();
     void deleteR(int warNo);
     void deleteB(int warNo);
-    void preFight();
+    void arrowFight();
+    void RaiseFlag(int );
+    void bombCheck();
+    void gainElements()
+    {
+        elements += 10;
+    }
+
+    void hqTake( HQ * hq);
+
     void DragonRoar( int side);
     int endFight = 1;
 };
 
-City * cities[20];
+City * cities[24];
 
 
 class HQ
@@ -124,7 +138,7 @@ class HQ
     public:
     static int warH[5];
     static int warA[5];
-    int side;
+    int side; // 0 red, 1 blue
 
     char col[7];
     // dragon, ninja, iceman, lion, wolf.
@@ -143,7 +157,7 @@ class HQ
         strcpy(col, color[side]);
         
     }
-    void makeWarrior(int t);
+    bool makeWarrior(int t);
 
     void warriorDeath( int warNo);
     
@@ -166,12 +180,25 @@ class HQ
 
     void victory()
     {
-        printT();
+
         if( side) //blue hq
-            printf("%s headquarter was taken\n", color[0]);
+        {
+            warEndb ++;
+            if( warEndb == 2)
+            {
+                printT();
+                printf("%s headquarter was taken\n", color[0]);
+            }
+        }
         else
-            printf("%s headquarter was taken\n", color[1]);
-        warEnd = 1;
+        {
+            warEndr ++;
+            if( warEndr == 2)
+            {
+                printT();
+                printf("%s headquarter was taken\n", color[1]);
+            }
+        }
     }
     void printHealth()
     {
@@ -179,23 +206,7 @@ class HQ
             printf("%d elements in %s headquarter\n", M, col);
     }
     
-
-    void output(Warrior * p, int t, int end = 0, int hasStopped = 0)
-    {
-        if (hasStopped && end)
-            return;
-        else if (end)
-        {
-            printT();
-            printf("%s headquarter stops making warriors\n", col);
-        }
-        else
-        {
-            printT();
-            printf("%s %s %d born\n", col, name[t], nWarrior);
-            if (t == 3) printf( "Its loyalty is %d\n", M);
-        }
-    }  
+    void output(Warrior * p, int t, int end = 0, int hasStopped = 0);
 };
 
 class Warrior
@@ -206,12 +217,13 @@ class Warrior
 
     
     public:
-    float morale;
+    double morale = 0.0;
     int nloc;
     int strength;
-    int preHp;
+    int reachedHQ = 0;
+    int preHp = 0;
     int no;
-    int preSdmg;
+    int preSdmg = 0;
     HQ* side;
     int weapPos = 0;
     int type;
@@ -220,6 +232,7 @@ class Warrior
     int hp;
     int steps = 0;
     int won = 0;
+    int moved = 0;
 
     Weapon * pWeaps[3] = {NULL};
 
@@ -256,27 +269,58 @@ class Warrior
 
     void reportWeaps()
     {
-        int scnt =0; int bcnt =0; int acnt = 0;
-        for( int i = 0; i < 10; i++)
+        int scnt = -1; int bcnt = -1; int acnt = -1; 
+        int sum = 0; //counts how many weapons, max 3
+        for( int i = 0; i < 3; i++)
             if( pWeaps[i] != NULL)
                 switch (pWeaps[i] -> No)
                 {
-                    case 0: scnt++; break;
-                    case 1: bcnt++; break;
-                    case 2: acnt++; break;
+                    case 0: scnt = i; sum++; break;
+                    case 1: bcnt = i; sum++; break;
+                    case 2: acnt = i; sum++; break;
                 }
         printT();
-        printf("%s %s %d has %d sword %d bomb %d arrow and %d elements\n", side -> col, name[type], no, scnt, bcnt, acnt, hp);
+
+        switch(sum)
+        {
+            case 0: printf( "%s %s %d has no weapon", side -> col, name[type], no); break;
+            case 1: {
+                printf( "%s %s %d has ", side -> col, name[type], no); 
+                if(acnt != -1) pWeaps[acnt] -> printWeap(); 
+                else if( bcnt != - 1) pWeaps[bcnt] -> printWeap(); 
+                else if( scnt != - 1) pWeaps[scnt] -> printWeap(); 
+            } break;
+            default: {
+                printf( "%s %s %d has ", side -> col, name[type], no);
+                int flag = 0;
+                if( acnt != - 1) { 
+                    pWeaps[acnt] -> printWeap(); flag = 1;
+                }
+                if( bcnt != - 1) 
+                { 
+                    if(flag) cout << ",";
+                    pWeaps[bcnt] -> printWeap(); 
+
+                }
+                if( scnt != - 1) {
+                    cout << ",";
+                    pWeaps[scnt] -> printWeap(); 
+                }
+            }
+            break;
+        }
+                cout << "\n";
+        
 
     }
 
     virtual void runAway() {}
     friend class HQ;
 
-    virtual void hurt (int n){
+    virtual void hurt (int n, int arrow = 0){
         hp -= n;
         
-        if (hp <= 0)
+        if (hp <= 0 && arrow == 0)
         {
             hp = 0;
             loc -> endBattle(); 
@@ -285,14 +329,116 @@ class Warrior
 
     virtual void counterA( Warrior * p)
     {
-        p ->hurt(pWeaps[0] -> getDmg() / 2);
+        //flatout attack
+        if( won)
+        {
+            won = 0;
+            onWin (p);
+            return;
+        }
+        printT(); 
+        printf("%s %s %d fought back against %s %s %d in city %d\n", side -> col, name[type], no, p -> side -> col, name[p ->type], p -> no, nloc);
+        p -> hurt( strength / 2);
+        if( weapCnt > 0)
+        int weapPos;
+        for( weapPos = 0; weapPos < 3; weapPos++)
+                if( pWeaps[weapPos] != NULL)
+                    if (pWeaps[weapPos] ->No == 0)
+                    {
+                        p ->hurt(pWeaps[weapPos] -> getDmg());
+                        pWeaps[weapPos] ->useWeapon();
+                        if( pWeaps[weapPos] -> damage == 0) {pWeaps[weapPos] = NULL;
+                        weapCnt --;
+                        }
+                        break;
+                    }
+        if( won)
+        {
+            won = 0;
+            onWin (p);
+        }
+        else
+            lionLoseLoy();
+
+
+        
     }
 
-    virtual void attack(Warrior * p)
+
+    void shootArrow(Warrior * p)
+    {
+        if( weapCnt > 0)
+        {
+            for( weapPos = 0; weapPos < 3; weapPos++)
+                if( pWeaps[weapPos] != NULL)
+                    if (pWeaps[weapPos] ->No == 2)
+                        break;
+            if ( weapPos == 3){
+                weapPos = 0;
+                return;
+            }
+            if ( pWeaps[weapPos] -> No == 2)
+            {
+                moved = 1;
+                printT(); 
+                printf("%s %s %d shot", side -> col, name[type], no);  
+                p -> hurt(R, 1);
+                if( pWeaps[weapPos] -> used == 2)
+                {
+                    delete pWeaps[weapPos];
+                    pWeaps[weapPos] = NULL;
+                    weapCnt --;
+                }
+
+                if( p-> hp <= 0) // enem died.
+                {
+                    printf(" and killed %s %s %d", p -> side -> col, name[p ->type], p -> no);
+                    if( p -> side -> side == 0 && p -> loc -> blueWar != NULL)
+                        p -> loc -> blueWar -> won = 1;
+                    else if( p -> side -> side == 1 && p -> loc -> redWar != NULL)
+                        p -> loc -> redWar -> won = 1;
+                    
+                    p -> hp = 0;
+                    
+                }
+
+                cout << endl;
+
+                if( pWeaps[weapPos] != NULL)
+                {
+                    pWeaps[weapPos] -> useWeapon();
+                    if( pWeaps[weapPos] -> damage == 0) {
+                        pWeaps[weapPos] = NULL;
+                        weapCnt --;}
+                }
+            }
+        }
+    }
+
+    void attack(Warrior * p)
     {    
         //        if(enem_die)
+
+        if( won)
+        {
+            won = 0;
+            onWin (p);
+            return;
+        }
+        //if( p-> won) return;
+        if( hp <= 0 || p -> won) 
+            return;
         //    return;
-        
+        if( weapPos == 3) weapPos = 0;
+        //find sword
+        for( weapPos = 0; weapPos < 3; weapPos++)
+                if( pWeaps[weapPos] != NULL)
+                    if (pWeaps[weapPos] ->No == 0)
+                        break;
+
+        if( weapPos == 3 ) weapPos = 0;
+            for( ; pWeaps[weapPos] == NULL; weapPos++)
+                
         
         if( p == NULL || p -> hp == 0)
         {
@@ -300,91 +446,146 @@ class Warrior
             enem_die = 1;
             return;
         } 
-        
 
-        //if is bomb hurting self
-        if( pWeaps[0] -> No == 1)
+        printT(); 
+        printf("%s %s %d attacked %s %s %d in city %d with %d elements and force %d\n", side -> col, name[type], no, p -> side -> col, name[p ->type], p -> no, nloc, hp, strength);  
+        p -> hurt( strength);
+
+        if( weapCnt > 0 )
         {
-            p -> hp -= pWeaps[0] -> getDmg();
-            hp -= pWeaps[0] -> getDmg() / 2;
-            //killed itself with bomb
-            delete pWeaps[0];
-            pWeaps[0] = NULL;
-            weapCnt --;
-            if( hp <= 0 && p -> hp <= 0)
+            switch( pWeaps[weapPos] -> No)
             {
-                hp = 0; p-> hp = 0;
-                loc -> endBattle();
-                return;
+                case 0: {
+                    p -> hurt( pWeaps[weapPos] -> getDmg());  
+                    pWeaps[weapPos] -> useWeapon();
+                    if( pWeaps[weapPos] -> damage == 0){ pWeaps[weapPos] = NULL;
+                    weapCnt --;}
+                } break;
             }
-            else if(hp <= 0)
-            {
-                hp = 0;
-                loc -> endBattle();
-                p -> onWin(this);
-                return;
-            }
-            else if( p -> hp <= 0)
-            {
-                p-> hp = 0;
-                loc -> endBattle();
-                if( won)
-                    onWin (p);
-                return;
-            }
-            //weapPos++;
         }
-        else if( pWeaps[0] -> No == 2 && pWeaps[0] -> used == 2)
-        {
-            p -> hurt( pWeaps[0] -> getDmg());
-            delete pWeaps[0];
-            pWeaps[0] = NULL;
-            weapCnt --;
-            //weapPos++;
-        }
-        else 
-            p -> hurt( pWeaps[0] -> getDmg());
-
-
-        if( pWeaps[0] != NULL)
-            pWeaps[0] -> useWeapon();
 
         if( won)
+        {
+            won = 0;
             onWin (p);
+        }
         else
             lionLoseLoy();
-
-        /*
-        redWar -> side -> warriorDeath(redWar -> no);
-        blueWar -> side -> warriorDeath(blueWar -> no);
-        */
+            //weapPos++;
     }
 
-    //
+    void useBomb( Warrior *p)
+    {
+        if(hp <= 0 || p -> hp <= 0) return;
+
+        //if (moved) return;
+        int hasSword = 0;
+        int sumDmg = 0;
+        int sworddmgself = 0;
+
+        if( loc -> whoStart == -1 && side -> side == 0 || loc -> whoStart == 1 && side -> side == 1)
+        {
+            for( int i = 0 ; i < 3; i++)
+                if( pWeaps[i] != NULL && pWeaps[i] -> No == 0)
+                {
+                    sworddmgself = pWeaps[i] -> damage; break;
+                }
+            if( strength + sworddmgself >= p -> hp)
+            {
+                return;
+            }
+        }
+
+        if( weapCnt > 0 && (strength + sworddmgself < p -> hp || loc -> whoStart == -1 && side -> side == 1 || loc -> whoStart == 1 && side -> side == 0))
+        {
+            for( weapPos = 0; weapPos < 3; weapPos++)
+                if( pWeaps[weapPos] != NULL)
+                    if (pWeaps[weapPos] ->No == 1)
+                        break;
+            if ( weapPos == 3){
+                weapPos = 0;
+                return;
+            }
+            if ( pWeaps[weapPos] -> No == 1)
+            {
+                //detecting if enemy has enough damage to kill.
+                if ( loc -> whoStart == -1 && side -> side == 1 || loc -> whoStart == 1 && side -> side == 0)
+                {
+                    int i = 0;
+                    for( ; i < 3; i++)
+                        if( p -> pWeaps[i] != NULL && p -> pWeaps[i] -> No == 0)
+                        {
+                            hasSword = 1; break;
+                        }
+                    
+                    if( hasSword) sumDmg = p->strength + p -> pWeaps[i] -> damage;
+                    else sumDmg = p -> strength;
+                    
+                } else {
+                    int i = 0;
+                    for( ; i < 3; i++)
+                        if( p -> pWeaps[i] != NULL && p -> pWeaps[i] -> No == 0)
+                        {
+                            hasSword = 1; break;
+                        }
+                    if( hasSword) sumDmg = p->strength / 2 + p -> pWeaps[i] -> damage;
+                    else sumDmg = p -> strength /2;
+                    if (p -> type == 1) sumDmg = 0;
+                    
+                }
+
+                if( sumDmg >= hp)//checking if sumdmg is enough
+                {
+                    //suicide bombing
+                    hp = 0; p-> hp = 0;
+                    mins = 38;
+                    printT(); 
+                    printf("%s %s %d used a bomb and killed %s %s %d\n", side -> col, name[type], no, p -> side -> col, name[p ->type], p -> no);    
+                    loc -> endBattle();
+                }
+            }
+        }
+    }
+
     virtual void onWin( Warrior * p) //this won p.
     {
         if( p -> type == 3)
             hp += p -> preHp;
-        p -> side -> warriorDeath(p -> no); //died
         if(side -> rewardWar())
+        {
             hp += 8;
+        }
+        if( type == 0)
+        morale += 0.2;
+        loc -> DragRoarTest();
+        //hq gaining elements
+        loc -> warTake( this);
+        int s = 1;
+        if( side -> side == 0) s= -1;
+
+        //loc -> DragonRoar( s);
+
+        if( side -> side == 0)
+            loc -> RaiseFlag(-1);
+        else
+            loc -> RaiseFlag(1);
+        p -> side -> warriorDeath(p -> no); //died
+
         
     }
-    virtual void preFight( Warrior * p)
+    virtual void preFight( Warrior * p) //checks bomb
     {
-        //check if both sides have weapon..
         enem_die = 0;
-        won = 0;
+        //won = 0;
         preHp = hp;
-        if( pWeaps[0] -> No == 0)
-        preSdmg = pWeaps[0] -> damage;
+        for( int i = 0; i < 3; i++)
+        if( pWeaps[i] != NULL && pWeaps[i] -> No == 0)
+            preSdmg = pWeaps[i] -> damage;
 
-        if ((weapCnt == 0 && p-> weapCnt == 0 ))
-        {
-            loc -> endBattle();
-            return;
-            //end battle; return;
-        }
+        useBomb(p);
+        //shoot arrows:
+        //
+        
     }
 
     virtual void lionLoseLoy()
@@ -403,6 +604,7 @@ class Warrior
                 hp -= 9; strength += 20;
             }
         }
+
         if (side -> side == 0)
         {
             loc = cities[++nloc];
@@ -421,17 +623,20 @@ class Warrior
     }
     void printMove()
     {        
+        if( reachedHQ) return;
         printT();
         if (side -> side == 0)
             if (loc -> CityNo == N -1)
             {
+                reachedHQ = 1;
                 printf("%s %s %d reached blue headquarter with %d elements and force %d\n", side -> col, name[type], no, hp, strength);
                 side -> victory();
                 return;
             }
         if( side -> side == 1)
             if (loc -> CityNo == 0)
-                {    
+                {
+                    reachedHQ = 1;
                     printf("%s %s %d reached red headquarter with %d elements and force %d\n", side -> col, name[type], no, hp, strength);
                     side -> victory();
                     return;
@@ -451,89 +656,18 @@ class ninja: public Warrior
         type = 1;
         pWeaps[0] = getWeapon(warriorNo, this); 
         pWeaps[1] = getWeapon(warriorNo + 1, this); 
+        if( pWeaps[0] -> damage == 0 && pWeaps[0] -> No == 0){ pWeaps[0] = NULL;
+                    weapCnt --;}
+        if( pWeaps[1] -> damage == 0 && pWeaps[1] -> No == 0){ pWeaps[1] = NULL;
+        weapCnt --;}
     } 
-    void counterA(){}
-
-
-    void attack(Warrior * p)
-    {    
-        //        if(enem_die)
-        //    return;
-        if( weapPos == 2) weapPos = 0;
-
-        
-        //find first weapon
-        int cnt = 0;
-        for( ; pWeaps[weapPos] == NULL; weapPos++ )
-        {
-            if( weapPos == 10) weapPos = 0;
-            cnt++;
-            if( pWeaps[weapPos] != NULL) break;
-            if( cnt >= 12 || weapCnt <= 0) return;
-        }
-        
-        
-        if( p == NULL || p -> hp == 0)
-        {
-            loc -> endBattle();
-            enem_die = 1;
-            return;
-        } 
-
-        //if is bomb hurting self
-        if( pWeaps[weapPos] -> No == 1)
-        {
-            p -> hp -= pWeaps[weapPos] -> getDmg();
-            //killed itself with bomb
-            delete pWeaps[weapPos];
-            pWeaps[weapPos] = NULL;
-            weapCnt --;
-            if( hp <= 0 && p -> hp <= 0)
-            {
-                hp = 0; p-> hp = 0;
-                loc -> endBattle();
-                return;
-            }
-            else if(hp <= 0)
-            {
-                hp = 0;
-                loc -> endBattle();
-                p -> onWin(this);
-                return;
-            }
-            else if( p -> hp <= 0)
-            {
-                p-> hp = 0;
-                loc -> endBattle();
-                if( won)
-                    onWin (p);
-                return;
-            }
-            //weapPos++;
-        }
-        else if( pWeaps[weapPos] -> No == 2 && pWeaps[weapPos] -> used)
-        {
-            p -> hurt( pWeaps[weapPos] -> getDmg());
-            delete pWeaps[weapPos];
-            pWeaps[weapPos] = NULL;
-            weapCnt --;
-            //weapPos++;
-        }
-        else 
-            p -> hurt( pWeaps[weapPos] -> getDmg());
-
-
-        if( pWeaps[weapPos] != NULL)
-            pWeaps[weapPos] -> useWeapon();
-        weapPos ++;
-
+    void counterA( Warrior * p){
         if( won)
+        {
+            won = 0;
             onWin (p);
-
-        /*
-        redWar -> side -> warriorDeath(redWar -> no);
-        blueWar -> side -> warriorDeath(blueWar -> no);
-        */
+            return;
+        }
     }
 
 };
@@ -541,14 +675,16 @@ class ninja: public Warrior
 class dragon: public Warrior
 {
     public:
-    dragon( int a, int h, int warriorNo, int hqH, HQ* side): Warrior( a, h, warriorNo, side)
+    dragon( int a, double h, int warriorNo, double hqH, HQ* side): Warrior( a, h, warriorNo, side)
     { 
         type = 0;
         if (h == 0) morale = 0;
         else
-        morale = hqH / h;
+            morale = hqH / h;
 
-        pWeaps[0] = getWeapon(warriorNo, this); 
+        pWeaps[0] = getWeapon(warriorNo, this);
+        if( pWeaps[0] -> damage == 0 && pWeaps[0] -> No == 0){ pWeaps[0] = NULL;
+            weapCnt --;}
     }
 
 };
@@ -559,6 +695,8 @@ class iceman: public Warrior
     {
         type = 2;
         pWeaps[0] = getWeapon(warriorNo, this); 
+        if( pWeaps[0] -> damage == 0 && pWeaps[0] -> No == 0){ pWeaps[0] = NULL;
+            weapCnt --;}
     } 
 };
 
@@ -572,22 +710,12 @@ class wolf: public Warrior
         type = 4;
     }
 
-    void preFight( Warrior * p){
-        won = 0;
-        enem_die = 0;
-        preHp = hp;
-        //if not wolf, stealing weapon
-        int stolencnt = 0;
-
-
-    }
-
     void onWin( Warrior *p) //this won p
     {
         enem_die = 1;
         for (int i = 0; i < 3; i++)
         {
-            if (weapCnt < 10)
+            if (weapCnt < 4)
                 if ( p -> pWeaps[i] != NULL && hasTypes[p -> pWeaps[i] -> No] == 0)
                 {
                     hasTypes[p -> pWeaps[i] -> No] = 1;
@@ -595,8 +723,8 @@ class wolf: public Warrior
                     //giving weapon
                     p -> pWeaps[i] -> newOwner(this);
                     //finding next empty weapos
-                    for( ; pWeaps[0] != NULL; weapPos++)
-                        if( weapPos == 10) weapPos = 0;
+                    for( ; pWeaps[weapPos] != NULL; weapPos++)
+                        if( weapPos == 3) weapPos = 0;
 
                     pWeaps[weapPos] = p -> pWeaps[i];
 
@@ -607,9 +735,20 @@ class wolf: public Warrior
         }
         if( p -> type == 3)
             hp += p -> preHp;
-        p -> side -> warriorDeath(p -> no); //died
         if(side -> rewardWar())
+        {
             hp += 8;
+        }
+        loc -> DragRoarTest();
+        //hq gaining elements
+        loc -> warTake( this);
+
+        if( side -> side == 0)
+            loc -> RaiseFlag(-1);
+        else
+            loc -> RaiseFlag(1);
+        p -> side -> warriorDeath(p -> no); //died
+
     }
 };
 
@@ -619,7 +758,6 @@ class lion: public Warrior
     int loyalty;
     lion ( int a, int h, int warriorNo, int hqH, HQ* side): Warrior( a, h, warriorNo, side), loyalty( hqH) {
         type = 3;
-        pWeaps[0] = getWeapon(warriorNo, this); 
     }
     void lionLoseLoy()
     {
@@ -660,10 +798,11 @@ void HQ::init()
 
 Weapon:: Weapon (int i, Warrior * p): damage(i), pOwner(p) {}
 
-void Sword:: updateDmg(int percent = 100)
+void Sword:: updateDmg(int percent)
 {
     damage = pOwner -> preSdmg * percent / 100;
 }
+
 
 Sword:: Sword(Warrior * p): Weapon( int(p -> strength * 2 / 10), p) {
         No = 0;
@@ -677,64 +816,153 @@ void Bomb:: updateDmg ()
 {
 }
 
+void Sword:: printWeap() {
+    printf("sword(%d)", damage);
+}
+
+void Arrow:: printWeap() {
+    printf("arrow(%d)", 3 - used);
+}
+void Bomb:: printWeap() {
+    printf("bomb", damage);
+}
 Arrow:: Arrow( Warrior * p): Weapon( R, p) {
         No = 2;
 }
-void Arrow:: updateDmg (int percent = 100) 
+void Arrow:: updateDmg () 
 {
     damage = R;
 }
 
-void City:: preFight()
+void City:: arrowFight()
+{
+    Warrior * penem;
+    if( CityNo < N-1 && redWar != NULL && cities[CityNo + 1] -> blueWar != NULL)
+    {
+        penem = cities[CityNo + 1] -> blueWar;
+        redWar -> moved = 0;
+        redWar -> shootArrow( penem);
+    }
+    if( CityNo > 1 && blueWar != NULL && cities[CityNo - 1] -> redWar != NULL )
+    {
+        penem = cities[CityNo - 1] -> redWar;
+        blueWar -> moved = 0;
+        blueWar -> shootArrow( penem);
+    }
+}
+
+void City:: bombCheck()
 {
     if (redWar != NULL && blueWar != NULL)
     {
-        redWar -> preFight(blueWar);
-        blueWar -> preFight(redWar);
+        if( (CityNo % 2 == 1 && flag == 0) || flag == -1)
+            whoStart = -1;
+        else
+            whoStart = 1;
+
         endFight = 0;
+            redWar -> preFight(blueWar);
+        if (redWar != NULL && blueWar != NULL)
+            blueWar -> preFight(redWar);
     }
 }
 
 void City:: fight()
 {
-        mins = 40;
-        int cnt = 0;
-            //干架
+    mins = 40;
+    int cnt = 0;
+        //干架
+    //finding if can shoot arrow.
+    int sflag = 0; //shot flag 
+    //if red side  
+
+    if( redWar != NULL && blueWar != NULL)
+    {
         if( (CityNo % 2 == 1 && flag == 0) || flag == -1)
         {
             redWar -> attack(blueWar);
             whoStart = -1;
-            if( blueWar != NULL) blueWar -> counterA( redWar);
+            if(endFight) return;
+            if( endFight == 0 && redWar != NULL && blueWar != NULL) blueWar -> counterA( redWar);
         }
         else
         {
+            if ( redWar != NULL && blueWar != NULL)
             blueWar -> attack(redWar);
             whoStart = 1;
-            if( redWar != NULL) redWar -> counterA( blueWar);
+            if(endFight) return;
+            if( endFight == 0 && redWar != NULL && blueWar != NULL) redWar -> counterA( blueWar);
         }
-        if( redWar == NULL  || blueWar == NULL)
-            {
-                endBattle();
-                return;
-            }
-        if( endFight == 0)
-            if( blueWar -> weapCnt == 0 && redWar -> weapCnt == 0) 
-                endBattle();
-        cnt ++;
-        if( cnt >= 30)
-        {
-            int dmg_sum = 0; int dmg_sump = 0;
-            for( int i = 0; i < 10; i++)
-            {
-                if (redWar -> pWeaps[i] != NULL) dmg_sum += redWar -> pWeaps[i] -> damage;
-                if (blueWar -> pWeaps[i] != NULL) dmg_sump += blueWar -> pWeaps[i] -> damage;
-            }
-            
-            if( endFight == 0)
-                if( dmg_sump == 0 && dmg_sum == 0) 
-                    endBattle();
-        }
-    return;
+        if( redWar != NULL && blueWar != NULL && redWar -> won != 1 && blueWar -> won != 1)
+            DragRoarTest();
+    } return;
+}
+
+void City::DragRoarTest()
+{
+    if( blueWar != NULL && blueWar -> hp > 0 && redWar != NULL && redWar -> hp > 0)
+    {
+        RaiseFlag(0);
+        DragonRoar(whoStart);
+    }
+    else if( blueWar != NULL && whoStart == 1 && blueWar -> hp > 0)
+    {
+        DragonRoar(whoStart);
+    }
+    else if( redWar != NULL && whoStart == -1 && redWar -> hp > 0)
+    {
+        DragonRoar(whoStart);
+    }
+    
+}
+
+void City :: warTake( Warrior * p)
+{
+    if( p != NULL)
+    {
+        printT();
+        printf("%s %s %d earned %d elements for his headquarter\n", p -> side -> col, name[p -> type], p -> no, elements);
+        hqTake( p -> side);
+        return;
+    }
+    if( redWar != NULL && blueWar == NULL) 
+    {
+        printT();
+        printf("red %s %d earned %d elements for his headquarter\n", name[redWar -> type], redWar -> no, elements);
+        hqTake( redWar -> side);
+    }
+    else if( blueWar != NULL && redWar == NULL) 
+    {
+        printT();
+        printf("blue %s %d earned %d elements for his headquarter\n", name[blueWar -> type], blueWar -> no, elements);
+        hqTake( blueWar -> side);
+    }
+}
+
+void HQ:: output(Warrior * p, int t, int end, int hasStopped)
+{
+    if (hasStopped && end)
+        return;
+    else if (end)
+    {
+        printT();
+        printf("%s headquarter stops making warriors\n", col);
+    }
+    else
+    {
+        printT();
+        printf("%s %s %d born\n", col, name[t], nWarrior);
+        if (t == 3) printf( "Its loyalty is %d\n", M);
+        if (t == 0) cout << fixed << setprecision(2) << "Its morale is " << p -> morale << endl;
+        //printf( "Its morale is %.2lf\n", p -> morale);
+    }
+}  
+
+void City :: hqTake( HQ * hq)
+{
+
+    hq -> M += elements;
+    elements = 0;
 }
 
 void City :: DragonRoar( int side = 0) //0 tests both, -1 only red, and 1 only blue
@@ -756,74 +984,98 @@ void City :: DragonRoar( int side = 0) //0 tests both, -1 only red, and 1 only b
 
 void City :: endBattle()
 {
-    if (endFight) return;
+    if (endFight) 
+    {
+        endFight = 0;
+        return;
+    };
     endFight = 1;
     mins = 40;
-    printT();
 
     
     if (blueWar -> hp <= 0 && redWar -> hp <= 0)
     {
-        deathCnt ++;
-        if( deathCnt == 1)
-        {
-            printf("both red %s %d and blue %s %d died in city %d\n", name[redWar -> type], redWar -> no, name[blueWar -> type], blueWar -> no, CityNo);
-            blueWar -> side -> warriorDeath( blueWar -> no);
-            redWar -> side -> warriorDeath( redWar -> no);
-        }
+        //printf("both red %s %d and blue %s %d died in city %d\n", name[redWar -> type], redWar -> no, name[blueWar -> type], blueWar -> no, CityNo);
+        blueWar -> side -> warriorDeath( blueWar -> no);
+        redWar -> side -> warriorDeath( redWar -> no);
         return;
     }
     else if (blueWar -> hp > 0 && redWar -> hp > 0)
     {
+        printT();
         printf("both red %s %d and blue %s %d were alive in city %d\n", name[redWar -> type], redWar -> no, name[blueWar -> type], blueWar -> no, CityNo);
         if( blueWar -> type == 0)
             blueWar -> morale -= 0.2;
         if( redWar -> type == 0)
             redWar -> morale -= 0.2;
+        
         DragonRoar(whoStart);
     }
     else if (redWar -> hp <= 0)
     {
-        printf("blue %s %d killed red %s %d in city %d remaining %d elements\n", name[blueWar -> type], blueWar -> no, name[redWar -> type], redWar -> no, CityNo, blueWar -> hp);
+        printT();
+        printf("red %s %d was killed in city %d\n", name[redWar -> type], redWar -> no, CityNo);
         blueWar -> won = 1;
-        if( last_won == 1)
-            flag = 1;  
-        else
-            flag = 0;
-        last_won = 1;
-        if( blueWar -> type == 0)
-            blueWar -> morale += 0.2;
-        DragonRoar(whoStart);
+
+
 
     }
     else if (blueWar -> hp <= 0)
     {
-        printf("red %s %d killed blue %s %d in city %d remaining %d elements\n", name[redWar -> type], redWar -> no, name[blueWar -> type], blueWar -> no, CityNo, redWar -> hp);
+        printT();
+        printf("blue %s %d was killed in city %d\n", name[blueWar -> type], blueWar -> no, CityNo);
         redWar -> won = 1;
-        DragonRoar(-1);
-        if( last_won == -1)
-            flag = -1;  
-        else
-            flag = 0;
-        last_won = -1;
-                
-        if( redWar -> type == 0)
-            redWar -> morale += 0.2;
-        DragonRoar(whoStart);
+
         //Blue Wins
         //blueWar -> side -> warriorDeath(blueWar -> no);
     }
 }
 
-void HQ:: makeWarrior(int t)
+void City :: printFlag( int i)
+{
+    if( i == -1) 
+    {   printT();
+    printf("red flag raised in city %d\n", CityNo);
+    }
+    if( i == 1) 
+    {
+        printT();
+        printf("blue flag raised in city %d\n", CityNo);
+    }
+
+}
+
+void City :: RaiseFlag(int i) //-1 red, 1 blue, 0 even.
+{
+    if( flag != 0)
+    {
+        if( last_won == i && flag != i && i != 0)
+        {
+            printFlag(i);
+            flag = i;
+        }
+    }
+    else if( last_won == i)
+    {
+        if( flag != i)
+        { 
+            printFlag(i);
+            flag = i; 
+        }
+    }
+
+    //if( i != 0 || flag == 0)
+    last_won = i;
+}
+
+
+bool HQ:: makeWarrior(int t)
 {
     
-    if (M <= warH[t]) 
+    if (M < warH[t]) 
     {
-        stop = 1;
-        return;
+        return false;
     }
-    if(stop) return;
 
     M -= warH[t]; //making warrior and subtracting health
     // what warrior to make. //dragon, ninja, iceman, lion, wolf.
@@ -849,7 +1101,8 @@ void HQ:: makeWarrior(int t)
         }
     }
     output(warriors[nWarrior], t);
-    //warrior_Alive[nWarrior] = 1;
+    return true;
+    //warrior_Alive[nWarrior] = 1;  
     
 }
 
@@ -861,7 +1114,6 @@ void HQ :: warriorDeath( int warNo)
     }
     else 
         warriors[warNo] -> loc -> blueWar = NULL;
-
     delete warriors[warNo];
     warriors[warNo] = NULL;
 }
@@ -877,11 +1129,13 @@ int main()
         hour = 0;
         mins = 0;
         minCnt = 0;
-        warEnd = 0;
+        warEndr = 0;
+        warEndb = 0;
+        int endFlag = 0;
 
         int M;
 
-        cin >> M >> N >> K >> T;
+        cin >> M >> N >> R >> K >> T;
         
         N += 2;
 
@@ -912,8 +1166,10 @@ int main()
             if(r >= 5) r -= 5;
             if(b >= 5) b -= 5;
             
-            pBase[0] -> makeWarrior(redl[r]);
-            pBase[1] -> makeWarrior(bluel[b]);
+            if (pBase[0] -> makeWarrior(redl[r]))
+                r++;
+            if( pBase[1] -> makeWarrior(bluel[b]))
+                b++;
 
             
             if( minCnt + 5 > T) break;
@@ -955,17 +1211,45 @@ int main()
                     cities[i] -> blueWar -> printMove();
             }
 
-            if(warEnd) break;
+            if(warEndr == 2 || warEndb == 2) break;
+            if( minCnt + 30 > T) break;
 
+            mins = 30;
+            for( int i = 1; i < N; i++)
+                cities[i] -> gainElements();
+
+            for( int i = 1; i < N -1; i++)
+                cities[i] -> warTake();
 
             if( minCnt + 35 > T) break;
             
             mins = 35;
-            for( int j = 0; j < N; j++)
+            for( int j = 1; j < N - 1; j++)
                 if( cities[j] ->blueWar != NULL || cities[j] -> redWar != NULL)
-                    cities[j] -> preFight();
+                    cities[j] -> arrowFight();
 
-            for( int j = 0; j < N; j++)
+            //cleaning up dead bodies
+            for( int j = 1; j < N - 1; j++)
+                if( cities[j] ->blueWar != NULL || cities[j] -> redWar != NULL)
+                {
+                    if( cities[j] -> blueWar != NULL && cities[j] -> blueWar -> hp <= 0 && (cities[j] -> redWar == NULL || (cities[j] -> redWar != NULL && cities[j] -> redWar -> hp <= 0)))
+                        pBase[1] -> warriorDeath( cities[j] -> blueWar -> no);
+                    if( cities[j] ->redWar != NULL && cities[j] ->redWar -> hp <= 0 && (cities[j] -> blueWar == NULL|| (cities[j] -> blueWar != NULL && cities[j] -> blueWar -> hp <= 0) ))
+                        pBase[0] -> warriorDeath ( cities[j] -> redWar -> no);
+                }
+            
+
+            if( minCnt + 38 > T) break;
+            mins = 38;
+            for( int j = 1; j < N - 1; j++)
+                if( cities[j] ->blueWar != NULL || cities[j] -> redWar != NULL)
+                    cities[j] -> bombCheck();
+
+
+
+            if( minCnt + 40 > T) break;
+            mins = 40;
+            for( int j = 1; j < N - 1; j++)
                 if( cities[j] ->blueWar != NULL || cities[j] -> redWar != NULL)
                     cities[j] -> fight();
 
@@ -981,16 +1265,14 @@ int main()
             
             mins = 55;
 
-            for( int i = 0; i < N; i++)
-            {
+            for( int i = 0; i <= N; i++)
                 if( cities[i] -> redWar != NULL)
                 cities[i] -> redWar -> reportWeaps();
+
+            for( int i = 0; i < N; i++)
                 if( cities[i] -> blueWar != NULL)
                 cities[i] -> blueWar -> reportWeaps();
-            }
             
-            r++;
-            b++;
             hour++;
             minCnt += 60;
         }

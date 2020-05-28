@@ -1,0 +1,5 @@
+﻿  mahjong_0.cpp
+C:\Users\admin\Desktop\mahjong_test\Project1\mahjong_0.cpp(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+C:\Users\admin\Desktop\mahjong_test\Project1\mahjong_0.cpp(106,20): warning C4101: “bg”: 未引用的局部变量
+C:\Users\admin\Desktop\mahjong_test\Project1\mahjong_0.cpp(51): warning C4715: “Getint”: 不是所有的控件路径都返回值
+  Project1.vcxproj -> C:\Users\admin\Desktop\mahjong_test\Project1\Debug\Project1.exe

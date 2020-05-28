@@ -1,43 +1,30 @@
 #include <iostream>
-#include <string>
+#include <vector>
+#include <functional>
+#include <algorithm>
 using namespace std;
-template <class T> 
-class container{
-// 在此处补充你的代码
-    T val;
-    public:
-    container (T v): val(v) {}
-    T operator + (const container & add)
+vector<int> numbers;
+int main(){ 
+    auto f = [](int & d)
     {
-        return val + add.val + add.val;
-    }
-
-    T operator + (T v)
-    {
-        return val + v;
+        return [&](int & x) 
+        {
+            return x % d ==0;
+        };
     }
     
-
-    friend ostream & operator << (ostream os, const T & obj)
-    {
-        os << obj;
-        return os;
+// 在此处补充你的代码
+;
+    int n, x, d;
+    while(cin >> n) {
+        numbers.clear();
+        for (int i = 1;i <= n;i ++){
+            cin >> x;
+            numbers.push_back(x);
+        }
+        cin >> d;
+        cout << count_if(numbers.begin(), numbers.end(), f(d)) << endl;
     }
-
-
-};
-int main(){
-	int n,m;
-	cin >> n >> m;
-	string s1,s2;
-	cin >> s1 >> s2;
-    container <int> a = n;
-    container <int> b = m;
-    cout<<a+b<<endl;
-    cout<<a+m<<endl;
-    container <string> sa = string(s1);
-    container <string> sb = string(s2);
-    cout<<sa+sb<<endl;
-    cout<< sa + s2<<endl;
     system("pause");
+    return 0;
 }
